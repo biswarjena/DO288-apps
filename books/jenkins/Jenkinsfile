@@ -21,7 +21,7 @@ pipeline {
     }
 
 
-    stages {
+     stages {
 
         stage('NPM Install') {
             steps {
@@ -58,14 +58,11 @@ pipeline {
                    '''
 
                 echo '### Creating a new app in DEV env ###'
-		sh '''
-			oc project ${DEV_PROJECT}
-			oc new-app --name books nodejs:8~${APP_GIT_URL} \
-			--build-env npm_config_registry=${NEXUS_SERVER} \
-			--context-dir ${APP_NAME}
-
-			oc expose svc/${APP_NAME}
-		   '''
+                sh '''
+                        oc project ${DEV_PROJECT}
+                        oc new-app --name books nodejs:8~${APP_GIT_URL} --build-env npm_config_registry=${NEXUS_SERVER} --context-dir ${APP_NAME}
+                        oc expose svc/${APP_NAME}
+                   '''
             }
         }
 
@@ -106,9 +103,11 @@ pipeline {
                 timeout(time: 60, unit: 'MINUTES') {
                     input message: "Promote to Staging?"
                 }
-		script {
-			openshift.withCluster() {
-			openshift.tag("${DEV_PROJECT}/books:latest", "${STAGE_PROJECT}/books:stage")
+                script {
+                    openshift.withCluster() {
+                    openshift.tag("${DEV_PROJECT}/books:latest", "${STAGE_PROJECT}/books:stage")
+                    }
+                }
             }
         }
 
@@ -122,12 +121,12 @@ pipeline {
                    '''
 
                 echo '### Creating a new app in Staging ###'
-            	sh '''
-			oc project ${STAGE_PROJECT}
-			oc new-app --name books -i books:stage
-			oc expose svc/${APP_NAME}
-		   '''
-		}
+                sh '''
+                        oc project ${STAGE_PROJECT}
+                        oc new-app --name books -i books:stage
+                        oc expose svc/${APP_NAME}
+                   '''
+            }
         }
 
         stage('Wait for deployment in Staging') {
@@ -138,13 +137,12 @@ pipeline {
                     routeHost = readFile('routehost').trim()
 
                     openshift.withCluster() {
-                        //TODO: Watch deployment until pod is in 'Running' state
-			openshift.withProject( "${STAGE_PROJECT}" ){
-			def deployment = openshift.selector("dc","${APP_NAME}").rollout()
-			openshift.selector("dc", "${APP_NAME}").related('pods').untilEach(1) {
-			return (it.object().status.phase == "Running")
-			 }
-			}
+                        openshift.withProject( "${STAGE_PROJECT}" ) {
+                            def deployment = openshift.selector("dc", "${APP_NAME}").rollout()
+                            openshift.selector("dc", "${APP_NAME}").related('pods').untilEach(1) {
+                                return (it.object().status.phase == "Running")
+                            }
+                        }
                         echo "Deployment to Staging env is complete. Access the app at the URL http://${routeHost}."
                     }
                 }
@@ -152,4 +150,3 @@ pipeline {
         }
     }
 }
-
